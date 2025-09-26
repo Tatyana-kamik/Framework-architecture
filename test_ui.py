@@ -4,15 +4,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-import random
 import time
 import allure
+
 
 @pytest.fixture
 def browser() -> webdriver.Chrome:
     """
     Фикстура для инициализации драйвера Selenium.
-
     Returns:
         webdriver.Chrome: Объект Chrome WebDriver.
     """
@@ -24,236 +23,156 @@ def browser() -> webdriver.Chrome:
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
 
     driver = webdriver.Chrome(options=options)
+    driver.implicitly_wait(50)  # Неявное ожидание
     yield driver  # Возвращаем объект драйвера для использования в тестах
     driver.quit()  # Закрываем браузер после выполнения тестов
 
 
-@allure.step("Тест главной страницы и наличие логотипа.")
+@allure.title("Проверка главной страницы и наличие логотипа")
+@allure.description("Тест главной страницы сайта Кинопоиск, проверяется наличие логотипа.")
+@allure.severity(allure.severity_level.NORMAL)
 def test_homepage_loads_and_has_logo(browser: webdriver.Chrome) -> None:
     """Главная страница загружается и содержит логотип.
-
     Args:
-        browser (webdriver. Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
-
-    Raises:
-        AssertionError: Если логотип не отображается на странице.
+        browser (webdriver.Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
     """
     browser.get("https://www.kinopoisk.ru/")
 
-    # Явное ожидание для загрузки страницы
-    WebDriverWait(browser, 15).until(
-        EC.title_contains("Кинопоиск")
-    )
+    # Ожидание загрузки страницы
+    WebDriverWait(browser, 15).until(EC.title_contains("Кинопоиск"))
 
     assert "Кинопоиск" in browser.title, f"Title: {browser.title}"
 
-    try:
-        logo = browser.find_element(By.CSS_SELECTOR, "a[href='/']")
-        assert logo.is_displayed(), "Логотип не отображается на главной странице."
-    except Exception as e:
-        logo = browser.find_element(By.XPATH, "//*[contains(@alt, 'Кинопоиск') or contains(@class, 'logo')]")
-        assert logo.is_displayed(), "Логотип не отображается на главной странице."
+    logo = browser.find_element(By.XPATH, "//*[contains(@alt, 'Кинопоиск') or contains(@class, 'logo')]")
+    assert logo.is_displayed(), "Логотип не отображается на главной странице."
 
 
-@allure.step("Поиск фильма 'Темные времена' и переход к актерам.")
+@allure.title("Поиск фильма 'Темные времена' и переход к актерам")
+@allure.description("Тестирует поиск фильма 'Темные времена' и проверяет переход к актерам на странице результатов.")
+@allure.severity(allure.severity_level.NORMAL)
 def test_search_movie(browser: webdriver.Chrome) -> None:
     """Тест поиска фильма 'Темные времена' и перехода к актерам.
-
     Args:
-        browser (webdriver. Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
-
-    Raises:
-        Exception: Если фильм не найден на странице.
+        browser (webdriver.Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
     """
+    # Шаг 1: Открываем сайт Кинопоиск
     browser.get("https://www.kinopoisk.ru/")
 
-    # Явное ожидание для поля поиска
+    # Шаг 2: Находим поле поиска и вводим название фильма
     search_box = WebDriverWait(browser, 15).until(
         EC.visibility_of_element_located((By.NAME, "kp_query"))
     )
-
-    # Имитация временной задержки для предотвращения капчи
-    time.sleep(random.uniform(5, 10))  # Долгая задержка для имитации реального пользователя
-
     search_box.send_keys("Темные времена")
+    search_box.submit()  # Отправка формы поиска
 
-    # Устанавливаем мышь на поле поиска
-    actions = ActionChains(browser)
-    actions.move_to_element(search_box).perform()
-    time.sleep(random.uniform(1, 3))  # Небольшая задержка
-
-    # Явное ожидание для кнопки поиска
-    search_button = WebDriverWait(browser, 15).until(
-        EC.element_to_be_clickable((By.CLASS_NAME, "styles_submit__KkHEO"))
+    # Шаг 3: Ожидание загрузки результатов
+    WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Темные времена')]"))
     )
-    search_button.click()
 
-    time.sleep(random.uniform(2, 4))  # Ждем некоторое время после клика
+    # Шаг 4: Находим элемент с фильмом
+    movie_link = browser.find_element(By.XPATH, "//a[contains(text(), 'Темные времена')]")
 
-    # Ожидаем появления элемента со ссылкой на фильм
-    try:
-        movie_link = WebDriverWait(browser, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'a[data-id="972777"]'))
-        )
-        movie_link.click()  # Переходим на страницу фильма
-        print("Фильм 'Темные времена' найден и открыта его страница.")
+    # Шаг 5: Прокрутка страницы вниз, удостоверяясь, что элемент виден
+    browser.execute_script("window.scrollTo(0, arguments[0].getBoundingClientRect().top + window.scrollY - 100);", movie_link)
 
-        # Переходим на вкладку "Актеры"
-        actors_tab = WebDriverWait(browser, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'a[data-id="972777"][href*="cast"]'))
-        )
+    # Вариант локатора для вкладки "Актеры"
+    actors_tab = WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'js-serp-metrika') and contains(@href, 'cast')]"))  # Селектор по классу и href
+    )
+    actors_tab.click()  # Клик по вкладке актеров
 
-        actions.move_to_element(actors_tab).perform()  # Имитация движения мыши
-        time.sleep(random.uniform(1, 3))  # Задержка перед кликом
-        actors_tab.click()  # Переход на страницу актеров
-        print("Перешли на вкладку 'Актеры'.")
-
-    except Exception as e:
-        print("Ошибка: фильм не найден на странице.", e)
+    # Проверка, что пользователь успешно на странице актеров
+    assert "Темные времена" in browser.title, "Не удалось перейти на страницу актёров."
 
 
-@allure.step("Проверка кнопки 'Онлайн-кинотеатр'.")
+@allure.title("Проверка кнопки 'Онлайн-кинотеатр'")
+@allure.description("Тестирует доступность кнопки 'Онлайн-кинотеатр'.")
+@allure.severity(allure.severity_level.NORMAL)
 def test_online_cinema_button(browser: webdriver.Chrome) -> None:
     """Тест проверки кнопки 'Онлайн-кинотеатр'.
-
     Args:
-        browser (webdriver. Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
-
-    Raises:
-        Exception: Если кнопка 'Онлайн-кинотеатр' не найдена.
+        browser (webdriver.Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
     """
+    # Шаг 1: Открываем сайт Кинопоиск
     browser.get("https://www.kinopoisk.ru/")
 
-    # Явное ожидание для загрузки страницы
+    # Шаг 2: Находим кнопку "Онлайн-кинотеатр" и кликаем на нее
+    online_cinema_button = WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.LINK_TEXT, "Онлайн-кинотеатр"))  # Стабильный локатор
+    )
+    online_cinema_button.click()  # Переход на страницу онлайн-кинотеатра
+
+    # Шаг 3: Ожидание загрузки страницы онлайн-кинотеатра
     WebDriverWait(browser, 15).until(
-        EC.title_contains("Кинопоиск")
+        EC.url_contains("https://hd.kinopoisk.ru/")  # Проверка URL
     )
 
-    # Поиск кнопки "Онлайн-кинотеатр" по классу
-    try:
-        online_cinema_button = WebDriverWait(browser, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "a.styles_root__jIQWR[href='https://hd.kinopoisk.ru/']"))
-        )
-        online_cinema_button.click()  # Переход на страницу онлайн-кинотеатра
-        print("Перешли на страницу 'Онлайн-кинотеатр'.")
-
-        # Явное ожидание для загрузки страницы онлайн-кинотеатра
-        WebDriverWait(browser, 15).until(
-            EC.title_contains("Онлайн-кинотеатр")
-        )
-
-        print("Страница 'Онлайн-кинотеатр' успешно загружена.")
-
-    except Exception as e:
-        print("Ошибка: кнопка 'Онлайн-кинотеатр' не найдена.", e)
+    # Проверяем, что текущий URL соответствует ожиданию
+    assert browser.current_url == "https://hd.kinopoisk.ru/", "Не удалось перейти на страницу 'Онлайн-кинотеатр'."
 
 
-@allure.step("Поиск фильма 'Матрица'.")
+@allure.title("Поиск фильма 'Матрица'")
+@allure.description("Тестирует поиск фильма 'Матрица'.")
+@allure.severity(allure.severity_level.NORMAL)
 def test_search_matrix(browser: webdriver.Chrome) -> None:
     """Тест поиска фильма 'Матрица'.
-
     Args:
-        browser (webdriver. Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
-
-    Raises:
-        Exception: Если страница результатов не загружена.
+        browser (webdriver.Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
     """
     browser.get("https://www.kinopoisk.ru/")
 
-    # Явное ожидание для поля поиска
+    # Шаг 1: Находим поле поиска и вводим название фильма
     search_box = WebDriverWait(browser, 15).until(
         EC.visibility_of_element_located((By.NAME, "kp_query"))
     )
-
-    # Имитация временной задержки для предотвращения капчи
-    time.sleep(random.uniform(5, 10))  # Долгая задержка для имитации реального пользователя
-
     search_box.send_keys("Матрица")
+    search_box.submit()  # Отправка формы поиска
 
-    # Устанавливаем мышь на поле поиска
-    actions = ActionChains(browser)
-    actions.move_to_element(search_box).perform()
-    time.sleep(random.uniform(1, 3))  # Небольшая задержка
-
-    # Явное ожидание для кнопки поиска
-    search_button = WebDriverWait(browser, 15).until(
-        EC.element_to_be_clickable((By.CLASS_NAME, "styles_submit__KkHEO"))
+    # Шаг 2: Ожидаем загрузку списка результатов
+    WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'search_results')]"))  # Учитываем загрузку интерактивных результатов
     )
-    search_button.click()
 
-    # Ожидаем, что страница загрузится
-    try:
-        WebDriverWait(browser, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
-            # Пример: ожидаем h1 заголовок на странице результатов
-        )
-        print("Страница с результатами поиска успешно загружена.")
-    except Exception as e:
-        print("Ошибка: страница результатов не загружена.", e)
+    # Шаг 3: Ищем ссылку на фильм "Матрица"
+    movie_link = WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Матрица')]"))
+    )
 
-    # Закрытие браузера по завершению
-    browser.quit()
+    assert movie_link.is_displayed(), "Фильм 'Матрица' не найден в результатах поиска."
+    movie_link.click()  # Переход к странице фильма
+
+    # Проверка, что заголовок страницы теперь содержит "Матрица"
+    assert "Матрица" in browser.title, "Не удалось перейти на страницу фильма 'Матрица'."
 
 
-@allure.step("Проверка кнопки 'Рецензии' к фильму 'Темные времена'.")
-def test_reviews_button(browser: webdriver.Chrome) -> None:
-    """Тест проверки кнопки 'Рецензии' к фильму 'Темные времена'.
-
+@allure.title("Проверка наличия постера для фильма 'Темные времена'")
+@allure.description("Тестирует, что постер загружен на странице фильма 'Темные времена'.")
+@allure.severity(allure.severity_level.NORMAL)
+def test_movie_poster(browser: webdriver.Chrome) -> None:
+    """Тест проверки наличия постера для фильма 'Темные времена'.
     Args:
-        browser (webdriver. Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
-
-    Raises:
-        Exception: Если рецензии не найдены.
+        browser (webdriver.Chrome): Драйвер Chrome для взаимодействия с веб-страницей.
     """
     browser.get("https://www.kinopoisk.ru/")
 
-    # Явное ожидание для поля поиска
+    # Шаг 1: Находим поле поиска и вводим название фильма
     search_box = WebDriverWait(browser, 15).until(
         EC.visibility_of_element_located((By.NAME, "kp_query"))
     )
-
-    # Имитация временной задержки для предотвращения капчи
-    time.sleep(random.uniform(5, 10))  # Долгая задержка для имитации реального пользователя
-
     search_box.send_keys("Темные времена")
+    search_box.submit()  # Отправка формы поиска
 
-    # Устанавливаем мышь на поле поиска
-    actions = ActionChains(browser)
-    actions.move_to_element(search_box).perform()
-    time.sleep(random.uniform(1, 3))  # Небольшая задержка
-
-    # Явное ожидание для кнопки поиска
-    search_button = WebDriverWait(browser, 15).until(
-        EC.element_to_be_clickable((By.CLASS_NAME, "styles_submit__KkHEO"))
+    # Шаг 2: Ожидаем загрузки результата и кликаем на фильм
+    movie_link = WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Темные времена')]"))
     )
-    search_button.click()
+    movie_link.click()  # Переход на страницу фильма
 
-    # Ожидаем появления элемента со ссылкой на фильм
-    try:
-        movie_link = WebDriverWait(browser, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'a[data-id="972777"]'))
-        )
-        movie_link.click()  # Переходим на страницу фильма
-        print("Фильм 'Темные времена' найден и открыта его страница.")
+    # Шаг 3: Ожидание загрузки постера
+    poster = WebDriverWait(browser, 30).until(
+        EC.presence_of_element_located((By.XPATH, "//img[contains(@class, 'film-poster')]"))
+    )
 
-        # Прокрутка страницы вниз до кнопки "Рецензии"
-        reviews_button = WebDriverWait(browser, 30).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'a[href="/film/972777/reviews/"]'))
-        )
-        browser.execute_script("arguments[0].scrollIntoView();", reviews_button)  # Прокрутка к элементу
-        time.sleep(random.uniform(1, 3))  # Небольшая задержка для завершения прокрутки
-
-        reviews_button.click()  # Переход на страницу рецензий
-        print("Перешли на страницу 'Рецензии'.")
-
-        # Ожидаем загрузки страницы рецензий
-        WebDriverWait(browser, 15).until(
-            EC.title_contains("Рецензии")  # Проверьте, что заголовок страницы обновился
-        )
-        print("Страница 'Рецензии' успешно загружена.")
-
-    except Exception as e:
-        print("Ошибка: рецензии не найдены.", e)
-
-    # Закрытие браузера
-    browser.quit()
+    # Проверка, что постер отображается на странице
+    assert poster.is_displayed(), "Постер фильма 'Темные времена' не отображается на странице."
