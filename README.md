@@ -1,7 +1,8 @@
 # Framework-architecture
 Дипломная работа по автоматизации тестирования на python
 
-Байцурова Т.М.
+Байцурова Т.М. 
+Ссылка на финальный проект https://skyeng2024.yonote.ru/share/3d8040ed-c6a7-4f96-bd26-d9799450dc72
 
 Шаги:
 1. Склонировать проект 'https://github.com/Tatyana-kamik/Framework-architecture.git'
